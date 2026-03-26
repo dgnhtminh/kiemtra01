@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        const API_URL = "http://localhost:8000";
+
+        async function init() {
+            loadItems();
+        }
+
+        async function handleCreateStaff(e) {
+            e.preventDefault();
+            const name = prompt("Enter new staff name:");
+            if (!name) return;
+            try {
+                const res = await fetch(`${API_URL}/staff/staffs/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, department: "General", position: "Staff" })
+                });
+                const data = await res.json();
+                alert(`Staff created! ID is: ${data.id}`);
+            } catch (err) {
+                console.error(err);
+                alert("Failed to create staff");
+            }
+        }
+
+        async function handleCreateItem(e) {
+            e.preventDefault();
+            const staff_id = document.getElementById('staff_id').value;
+            const name = document.getElementById('name').value;
+            const desc = document.getElementById('desc').value;
+            const serial = document.getElementById('serial').value;
+
+            try {
+                const res = await fetch(`${API_URL}/staff/items/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        staff_id: parseInt(staff_id),
+                        name,
+                        description: desc,
+                        serial_number: serial,
+                        status: "Assigned"
+                    })
+                });
+                if (res.ok) {
+                    alert("Item imported successfully!");
+                    document.getElementById('import-form').reset();
+                    loadItems();
+                } else {
+                    const err = await res.json();
+                    alert("Import failed: " + err.detail);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Request failed.");
+            }
+        }
+
+        async function loadItems() {
+            try {
+                const res = await fetch(`${API_URL}/staff/items/`);
+                const data = await res.json();
+                
+                const tbody = document.getElementById('items-tbody');
+                tbody.innerHTML = data.map(item => `
+                    <tr>
+                        <td>${item.id}</td>
+                        <td>${item.name}</td>
+                        <td>${item.serial_number}</td>
+                        <td>
+                            <select id="status-${item.id}" style="width: auto; padding: 0.25rem;">
+                                <option value="Assigned" ${item.status === 'Assigned' ? 'selected' : ''}>Assigned</option>
+                                <option value="Maintenance" ${item.status === 'Maintenance' ? 'selected' : ''}>Maintenance</option>
+                                <option value="Returned" ${item.status === 'Returned' ? 'selected' : ''}>Returned</option>
+                            </select>
+                        </td>
+                        <td>${item.staff_id}</td>
+                        <td><button class="btn btn-primary btn-small" onclick="updateItem(${item.id})">Update</button></td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error("Failed to load items.", err);
+            }
+        }
+
+        async function updateItem(itemId) {
+            const status = document.getElementById(`status-${itemId}`).value;
+            try {
+                const res = await fetch(`${API_URL}/staff/items/${itemId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                if (res.ok) {
+                    alert("Item updated!");
+                    loadItems();
+                } else {
+                    alert("Failed to update item.");
+                }
+            } catch (err) {
+                alert("Error updating item.");
+            }
+        }
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-links">
+            <a href="index.html">⬅️ Hub</a>
+            <a href="#" onclick="handleCreateStaff(event)">+ Quick Add Staff</a>
+        </nav>
+
+        <h1>👨‍💻 Staff Portal</h1>
+
+        <div class="grid">
+            <!-- Upload Item -->
+            <div class="glass-panel" style="align-self: flex-start;">
+                <h2>📥 Input New Item</h2>
+                <form id="import-form" onsubmit="handleCreateItem(event)">
+                    <div class="form-group">
+                        <label>Staff ID (Receiver)</label>
+                        <input type="number" id="staff_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Item Name</label>
+                        <input type="text" id="name" required placeholder="e.g. MacBook Pro M2">
+                    </div>
+                    <div class="form-group">
+                        <label>Serial Number</label>
+                        <input type="text" id="serial" required placeholder="SN-12345">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="desc" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Input Item</button>
+                </form>
+            </div>
+
+            <!-- Manage Items -->
+            <div class="glass-panel" style="overflow-x: auto;">
+                <h2>📋 Manage Inventory</h2>
+                <button class="btn btn-small" style="margin-bottom: 1rem; width: auto; background: rgba(255,255,255,0.1); color: white;" onclick="loadItems()">Refresh List</button>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Serial</th>
+                            <th>Status</th>
+                            <th>Staff ID</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-tbody">
+                        <tr><td colspan="6">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

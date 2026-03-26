@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        const API_URL = "http://localhost:8000";
+        let customerId = localStorage.getItem("customerId");
+
+        async function init() {
+            if (customerId) {
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('main-section').style.display = 'block';
+                document.getElementById('welcome-msg').innerText = "Welcome back, Customer #" + customerId;
+                loadCart();
+            } else {
+                document.getElementById('auth-section').style.display = 'block';
+                document.getElementById('main-section').style.display = 'none';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch(`${API_URL}/customer/customers/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem("customerId", data.id);
+                    customerId = data.id;
+                    location.reload();
+                } else {
+                    alert("Invalid credentials. Try registering instead or check your password.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Login failed.");
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = email.split('@')[0];
+
+            try {
+                // Register
+                const res = await fetch(`${API_URL}/customer/customers/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, phone: "", address: "" })
+                });
+                if (res.ok) {
+                    alert("Registration successful. You can now login!");
+                    await handleLogin(e);
+                } else {
+                    const err = await res.json();
+                    alert("Registration failed: " + err.detail);
+                }
+            } catch (error) {
+                alert("Registration error.");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("customerId");
+            location.reload();
+        }
+
+        async function searchProducts(e) {
+            e.preventDefault();
+            const q = document.getElementById('search-query').value;
+            const type = document.getElementById('search-type').value; // 'laptop' or 'mobile'
+            
+            try {
+                const res = await fetch(`${API_URL}/${type}/${type}s/?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                
+                const resultsDiv = document.getElementById('search-results');
+                resultsDiv.innerHTML = '';
+
+                if (data.length === 0) {
+                    resultsDiv.innerHTML = "<p>No products found.</p>";
+                    return;
+                }
+
+                data.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'glass-panel';
+                    el.innerHTML = `
+                        <h3>${item.brand} - ${item.model}</h3>
+                        <p>Price: $${item.price}</p>
+                        ${type === 'laptop' ? `<p>Specs: ${item.specs}</p>` : `<p>Storage: ${item.storage} | Color: ${item.color}</p>`}
+                        <button class="btn btn-primary btn-small" onclick="addToCart(${item.id}, '${type}')">Add to Cart</button>
+                    `;
+                    resultsDiv.appendChild(el);
+                });
+            } catch (error) {
+                console.error(error);
+                alert("Search failed.");
+            }
+        }
+
+        async function addToCart(itemId, serviceType) {
+            try {
+                const res = await fetch(`${API_URL}/customer/carts/${customerId}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        item_id: itemId,
+                        service_type: serviceType,
+                        quantity: 1
+                    })
+                });
+                if (res.ok) {
+                    alert("Added to cart!");
+                    loadCart();
+                } else {
+                    alert("Failed to add to cart.");
+                }
+            } catch (err) {
+                alert("Error adding to cart.");
+            }
+        }
+
+        async function loadCart() {
+            try {
+                const res = await fetch(`${API_URL}/customer/carts/${customerId}`);
+                const data = await res.json();
+                
+                const cartDiv = document.getElementById('cart-items');
+                if (!data.items || data.items.length === 0) {
+                    cartDiv.innerHTML = "<p>Your cart is empty.</p>";
+                    return;
+                }
+
+                cartDiv.innerHTML = data.items.map(item => `
+                    <div style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0.5rem;">
+                        <strong>Type:</strong> ${item.service_type} | <strong>Item ID:</strong> ${item.item_id} | <strong>Quantity:</strong> ${item.quantity}
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-links">
+            <a href="index.html">⬅️ Hub</a>
+        </nav>
+
+        <h1>🛍️ Customer Portal</h1>
+
+        <!-- Authentication -->
+        <div id="auth-section" class="glass-panel" style="max-width: 400px; margin: 0 auto; display: none;">
+            <h2>Login / Register</h2>
+            <form id="auth-form">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email" required placeholder="customer@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-primary" onclick="handleLogin(event)">Login</button>
+                    <button class="btn" style="background: rgba(255,255,255,0.1); color: white;" onclick="handleRegister(event)">Register</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Main App Area -->
+        <div id="main-section" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 id="welcome-msg" style="border: none; margin: 0;"></h2>
+                <button class="btn btn-small" style="width: auto; background: rgba(239, 68, 68, 0.2); color: #fca5a5;" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="grid">
+                <!-- Search -->
+                <div class="glass-panel">
+                    <h2>🔍 Search Products</h2>
+                    <form onsubmit="searchProducts(event)">
+                        <div class="form-group">
+                            <label>Product Type</label>
+                            <select id="search-type">
+                                <option value="laptop">Laptops</option>
+                                <option value="mobile">Mobile Phones</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Keyword</label>
+                            <input type="text" id="search-query" placeholder="e.g. Dell, iPhone...">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </form>
+
+                    <div id="search-results" style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <!-- Results injected here -->
+                    </div>
+                </div>
+
+                <!-- Cart -->
+                <div class="glass-panel" style="align-self: flex-start;">
+                    <h2>🛒 Your Cart</h2>
+                    <div id="cart-items">
+                        <p>Loading cart...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
