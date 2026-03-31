@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
@@ -39,8 +39,9 @@ async def gateway(service_name: str, path: str, request: Request):
                 content=body,
                 params=dict(request.query_params)
             )
-            # Return the response from the microservice
-            return response.json()
+            # Return the response from the microservice with original status
+            media_type = response.headers.get("content-type", "application/json")
+            return Response(content=response.content, status_code=response.status_code, media_type=media_type)
         except httpx.RequestError as exc:
             raise HTTPException(status_code=503, detail=f"Service unavailable: {exc}")
 
